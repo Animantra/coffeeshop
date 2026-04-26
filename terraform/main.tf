@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "eu-north-1" # Твой регион
+  region = "eu-north-1" 
 }
 
 resource "aws_security_group" "coffeeshop_sg" {
