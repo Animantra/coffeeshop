@@ -1,43 +1,19 @@
-resource "aws_instance" "app_server" {
-    ami           = "ami-0014ce3e52359afbd" 
-  instance_type = "c7i-flex.large"            
-    key_name      = "coffeeshop-key"       
-
-    vpc_security_group_ids = [aws_security_group.app_sg.id]
-
-    tags = { Name = "Coffeeshop-Server" }
+provider "aws" {
+  region = "eu-north-1" # Твой регион
 }
 
-resource "aws_security_group" "app_sg" {
+resource "aws_security_group" "coffeeshop_sg" {
   name        = "coffeeshop-sg"
-  description = "Security group for Coffeeshop services"
+  description = "Allow web and monitoring traffic"
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 3000
-    to_port     = 3000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 9090
-    to_port     = 9090
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+  dynamic "ingress" {
+    for_each = [22, 80, 3000, 9090, 8888, 5001]
+    content {
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
   }
 
   egress {
@@ -45,5 +21,22 @@ resource "aws_security_group" "app_sg" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_instance" "app_server" {
+  ami           = var.ami_id
+  instance_type = var.instance_type
+  key_name      = var.key_name
+  vpc_security_group_ids = [aws_security_group.coffeeshop_sg.id]
+
+  user_data = <<-EOF
+              #!/bin/bash
+              sudo apt update
+              sudo apt install -y docker.io docker-compose-v2
+              EOF
+
+  tags = {
+    Name = "CoffeeShop-SRE"
   }
 }
