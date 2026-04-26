@@ -1,0 +1,17 @@
+app:
+  name: 'auth-service'
+  version: '1.0.0'
+
+http:
+  host: '0.0.0.0'
+  port: 5005
+
+logger:
+  log_level: 'debug'
+
+postgres:
+  url: 'postgres://postgres:P@ssw0rd@localhost:5432/postgres'
+
+jwt:
+  secret: 'supersecretkey_change_in_production'
+  expire_hours: 24

@@ -1,0 +1,221 @@
+services:
+
+  postgres:
+    container_name: coffeeshop-postgres
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=P@ssw0rd
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    networks:
+      - coffeeshop-network
+
+  rabbitmq:
+    container_name: coffeeshop-rabbitmq
+    image: rabbitmq:3.11-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - coffeeshop-network
+
+  prometheus:
+    container_name: coffeeshop-prometheus
+    image: prom/prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - coffeeshop-network
+
+  grafana:
+    container_name: coffeeshop-grafana
+    image: grafana/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - coffeeshop-network
+
+  product:
+    container_name: coffeeshop-product
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-product
+    image: go-coffeeshop-product
+    environment:
+      APP_NAME: 'product-service in docker'
+    ports:
+      - "5003:5001"
+    networks:
+      - coffeeshop-network
+
+  counter:
+    container_name: coffeeshop-counter
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-counter
+    image: go-coffeeshop-counter
+    environment:
+      APP_NAME: 'counter-service in docker'
+      IN_DOCKER: "true"
+      PG_URL: postgres://postgres:P@ssw0rd@postgres:5432/postgres
+      PG_DSN_URL: host=postgres user=postgres password=P@ssw0rd dbname=postgres sslmode=disable
+      # PG_URL: postgres://postgres:P@ssw0rd@postgres:9999/postgres
+      # PG_DSN_URL: host=wronghost user=postgres password=P@ssw0rd dbname=postgres sslmode=disable
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PRODUCT_CLIENT_URL: product:5001
+    ports:
+      - "5002:5002"
+      - "9091:9091"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - coffeeshop-network
+
+  barista:
+    container_name: coffeeshop-barista
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-barista
+    image: go-coffeeshop-barista
+    environment:
+      APP_NAME: 'barista-service in docker'
+      IN_DOCKER: "true"
+      PG_URL: postgres://postgres:P@ssw0rd@postgres:5432/postgres
+      PG_DSN_URL: host=postgres user=postgres password=P@ssw0rd dbname=postgres sslmode=disable
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - coffeeshop-network
+
+  kitchen:
+    container_name: coffeeshop-kitchen
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-kitchen
+    image: go-coffeeshop-kitchen
+    environment:
+      APP_NAME: 'kitchen-service in docker'
+      IN_DOCKER: "true"
+      PG_URL: postgres://postgres:P@ssw0rd@postgres:5432/postgres
+      PG_DSN_URL: host=postgres user=postgres password=P@ssw0rd dbname=postgres sslmode=disable
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - coffeeshop-network
+
+  auth:
+    container_name: coffeeshop-auth
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-auth
+    image: go-coffeeshop-auth
+    environment:
+      APP_NAME: 'auth-service in docker'
+      HTTP_HOST: '0.0.0.0'
+      HTTP_PORT: 5005
+      PG_URL: postgres://postgres:P@ssw0rd@postgres:5432/postgres?sslmode=disable
+      JWT_SECRET: 'supersecretkey_change_in_production'
+      JWT_EXPIRE_HOURS: 24
+    ports:
+      - "5005:5005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - coffeeshop-network
+
+  proxy:
+    container_name: coffeeshop-proxy
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-proxy
+    image: go-coffeeshop-proxy
+    environment:
+      APP_NAME: 'proxy-service in docker'
+      GRPC_PRODUCT_HOST: 'product'
+      GRPC_PRODUCT_PORT: 5001
+      GRPC_COUNTER_HOST: 'counter'
+      GRPC_COUNTER_PORT: 5002
+      AUTH_HOST: 'auth'
+      AUTH_PORT: 5005
+    ports:
+      - "5001:5000"
+    depends_on:
+      - product
+      - counter
+      - auth
+    networks:
+      - coffeeshop-network
+
+  web:
+    container_name: coffeeshop-web
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile-web
+    image: go-coffeeshop-web
+    environment:
+      - REVERSE_PROXY_URL=http://localhost:5001
+      - WEB_PORT=8888
+    ports:
+      - "8888:8888"
+    depends_on:
+      - proxy
+    networks:
+      - coffeeshop-network
+
+  cadvisor:
+    container_name: coffeeshop-cadvisor
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    privileged: true
+    user: root
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - //var/run:/var/run:ro
+      - //sys:/sys:ro
+      - //var/lib/docker:/var/lib/docker:ro
+    networks:
+      - coffeeshop-network
+
+networks:
+  coffeeshop-network:
+
+volumes:
+  grafana_data:
