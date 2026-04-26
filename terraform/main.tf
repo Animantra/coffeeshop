@@ -1,6 +1,6 @@
 resource "aws_instance" "app_server" {
-    ami = "ami-0fe8bec493a81c7da"
-    instance_type = "t3.micro"      
+    ami           = "ami-0014ce3e52359afbd" 
+  instance_type = "c7i-flex.large"            
     key_name      = "coffeeshop-key"       
 
     vpc_security_group_ids = [aws_security_group.app_sg.id]
