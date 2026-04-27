@@ -32,13 +32,36 @@ resource "aws_instance" "app_server" {
   key_name      = var.key_name
   vpc_security_group_ids = [aws_security_group.coffeeshop_sg.id]
 
+  root_block_device {
+    volume_size = 20  
+    volume_type = "gp3" 
+  }
   user_data = <<-EOF
               #!/bin/bash
-              sudo apt update
-              sudo apt install -y docker.io docker-compose-v2
+              sudo apt-get update
+              sudo apt-get upgrade -y
+              sudo fallocate -l 2G /swapfile
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile
+              sudo swapon /swapfile
+              echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+              sudo apt-get install -y docker.io docker-compose-v2 git curl
+              sudo systemctl start docker
+              sudo systemctl enable docker
+              sudo usermod -aG docker ubuntu
+
+    
+              cd /home/ubuntu
+              git clone https://${var.github_token}@github.com/Animantra/coffeeshop.git
+              
+              sudo chown -R ubuntu:ubuntu /home/ubuntu/coffeeshop
+
+              # cd /home/ubuntu/coffeeshop
+              # sudo docker compose up -d
               EOF
 
   tags = {
-    Name = "CoffeeShop-SRE"
+    Name = "CoffeeShop-SRE-Server"
   }
 }
