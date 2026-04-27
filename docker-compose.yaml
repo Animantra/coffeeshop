@@ -214,6 +214,18 @@ services:
     networks:
       - coffeeshop-network
 
+  nginx:
+    image: nginx:alpine
+    container_name: coffeeshop-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+    networks:
+      - coffeeshop-network
+
 networks:
   coffeeshop-network:
 
