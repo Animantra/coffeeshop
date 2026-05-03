@@ -30,7 +30,6 @@ go.work
 
 .terraform
 *tfstate*
-
 terraform.tfvars
 
 *.pem
