@@ -178,8 +178,6 @@ services:
       HTTP_HOST: '0.0.0.0'
       HTTP_PORT: 5005
       PG_URL: postgres://postgres:P@ssw0rd@postgres:5432/postgres?sslmode=disable
-      JWT_SECRET: 'supersecretkey_change_in_production'
-      JWT_EXPIRE_HOURS: 24
     ports:
       - "5005:5005"
     depends_on:
