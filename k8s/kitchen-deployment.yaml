@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kitchen-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kitchen-service
+  template:
+    metadata:
+      labels:
+        app: kitchen-service
+    spec:
+      containers:
+        - name: kitchen-service
+          image: go-coffeeshop-kitchen
+          imagePullPolicy: Never
+          env:
+            - name: APP_NAME
+              value: "kitchen-service in k8s"
+            - name: IN_DOCKER
+              value: "true"
+            - name: PG_URL
+              value: postgres://postgres:P@ssw0rd@postgres:5432/postgres
+            - name: PG_DSN_URL
+              value: host=postgres user=postgres password=P@ssw0rd dbname=postgres sslmode=disable
+            - name: RABBITMQ_URL
+              value: amqp://guest:guest@rabbitmq:5672/
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kitchen-service
+spec:
+  selector:
+    app: kitchen-service
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kitchen-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kitchen-service
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

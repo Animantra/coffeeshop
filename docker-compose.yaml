@@ -7,6 +7,7 @@ services:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=P@ssw0rd
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -20,6 +21,7 @@ services:
   rabbitmq:
     container_name: coffeeshop-rabbitmq
     image: rabbitmq:3.11-management-alpine
+    restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -37,8 +39,10 @@ services:
   prometheus:
     container_name: coffeeshop-prometheus
     image: prom/prometheus
+    restart: unless-stopped
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml
     ports:
       - "9090:9090"
     networks:
@@ -47,6 +51,7 @@ services:
   grafana:
     container_name: coffeeshop-grafana
     image: grafana/grafana
+    restart: unless-stopped
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -66,6 +71,7 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile-product
     image: go-coffeeshop-product
+    restart: unless-stopped
     environment:
       APP_NAME: 'product-service in docker'
     ports:
@@ -79,13 +85,17 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile-counter
     image: go-coffeeshop-counter
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     environment:
       APP_NAME: 'counter-service in docker'
       IN_DOCKER: "true"
       PG_URL: postgres://postgres:P@ssw0rd@postgres:5432/postgres
       PG_DSN_URL: host=postgres user=postgres password=P@ssw0rd dbname=postgres sslmode=disable
-      # PG_URL: postgres://postgres:P@ssw0rd@postgres:9999/postgres
-      # PG_DSN_URL: host=wronghost user=postgres password=P@ssw0rd dbname=postgres sslmode=disable
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       PRODUCT_CLIENT_URL: product:5001
     ports:
@@ -105,6 +115,12 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile-barista
     image: go-coffeeshop-barista
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     environment:
       APP_NAME: 'barista-service in docker'
       IN_DOCKER: "true"
@@ -125,6 +141,12 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile-kitchen
     image: go-coffeeshop-kitchen
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     environment:
       APP_NAME: 'kitchen-service in docker'
       IN_DOCKER: "true"
@@ -145,6 +167,12 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile-auth
     image: go-coffeeshop-auth
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5005/auth/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     environment:
       APP_NAME: 'auth-service in docker'
       HTTP_HOST: '0.0.0.0'
@@ -166,6 +194,7 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile-proxy
     image: go-coffeeshop-proxy
+    restart: unless-stopped
     environment:
       APP_NAME: 'proxy-service in docker'
       GRPC_PRODUCT_HOST: 'product'
@@ -189,6 +218,7 @@ services:
       context: .
       dockerfile: ./docker/Dockerfile-web
     image: go-coffeeshop-web
+    restart: unless-stopped
     environment:
       - REVERSE_PROXY_URL=http://localhost:5001
       - WEB_PORT=8888
@@ -202,6 +232,7 @@ services:
   cadvisor:
     container_name: coffeeshop-cadvisor
     image: gcr.io/cadvisor/cadvisor:v0.47.0
+    restart: unless-stopped
     privileged: true
     user: root
     ports:
@@ -217,6 +248,7 @@ services:
   nginx:
     image: nginx:alpine
     container_name: coffeeshop-nginx
+    restart: unless-stopped
     ports:
       - "80:80"
     volumes:
@@ -231,3 +263,4 @@ networks:
 
 volumes:
   grafana_data:
+  elasticsearch_data:

@@ -20,8 +20,7 @@ WORKDIR /root/
 
 COPY --from=builder /bin/app .
 COPY --from=builder /app/cmd/barista/config.yml .
-COPY --from=builder /app/db/migrations ./db/migrations
-
+COPY --from=builder /app/db/migrations ../../../db/migrations
 EXPOSE 8080
 
 CMD ["./app"]

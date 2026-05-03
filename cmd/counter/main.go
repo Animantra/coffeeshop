@@ -85,6 +85,17 @@ func main() {
 		}
 	}()
 
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status":"ok","service":"counter-service"}`))
+		})
+		if err := http.ListenAndServe(":9091", nil); err != nil {
+			slog.Error("metrics server failed", err)
+		}
+	}()
+
 	err = server.Serve(l)
 	if err != nil {
 		slog.Error("failed start gRPC server", err, "network", network, "address", address)

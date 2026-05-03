@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: barista-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: barista-service
+  template:
+    metadata:
+      labels:
+        app: barista-service
+    spec:
+      containers:
+        - name: barista-service
+          image: go-coffeeshop-barista
+          imagePullPolicy: Never
+          command: ["sh", "-c", "sleep 3600"]
+          env:
+            - name: APP_NAME
+              value: "barista-service in k8s"
+            - name: IN_DOCKER
+              value: "true"
+            - name: PG_URL
+              value: postgres://postgres:P@ssw0rd@postgres:5432/postgres
+            - name: PG_DSN_URL
+              value: host=postgres user=postgres password=P@ssw0rd dbname=postgres sslmode=disable
+            - name: RABBITMQ_URL
+              value: amqp://guest:guest@rabbitmq:5672/
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: barista-service
+spec:
+  selector:
+    app: barista-service
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: barista-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: barista-service
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

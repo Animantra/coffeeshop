@@ -36,7 +36,7 @@ resource "aws_instance" "app_server" {
     volume_size = 20  
     volume_type = "gp3" 
   }
-  user_data = file("scripts/script.sh")
+  user_data = file("${path.module}/scripts/script.sh")
 
   tags = {
     Name = "CoffeeShop-SRE-Server"

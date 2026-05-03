@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -70,6 +71,14 @@ func main() {
 		if err1 := l.Close(); err != nil {
 			slog.Error("failed to close", err1, "network", network, "address", address)
 		}
+	}()
+
+	go func() {
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status":"ok"}`))
+		})
+		http.ListenAndServe(":9092", nil)
 	}()
 
 	err = server.Serve(l)

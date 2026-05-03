@@ -1,3 +1,7 @@
+#!/bin/bash
+
+exec > /var/log/user-data.log 2>&1
+
 sudo apt-get update
 sudo apt-get upgrade -y
 sudo fallocate -l 2G /swapfile

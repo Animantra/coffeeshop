@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: counter-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: counter-service
+  template:
+    metadata:
+      labels:
+        app: counter-service
+    spec:
+      containers:
+        - name: counter-service
+          image: go-coffeeshop-counter
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5002
+            - containerPort: 9091
+          env:
+            - name: APP_NAME
+              value: "counter-service in k8s"
+            - name: IN_DOCKER
+              value: "true"
+            - name: PG_URL
+              value: postgres://postgres:P@ssw0rd@postgres:5432/postgres
+            - name: PG_DSN_URL
+              value: host=postgres user=postgres password=P@ssw0rd dbname=postgres sslmode=disable
+            - name: RABBITMQ_URL
+              value: amqp://guest:guest@rabbitmq:5672/
+            - name: PRODUCT_CLIENT_URL
+              value: product:5001
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: counter-service
+spec:
+  selector:
+    app: counter-service
+  ports:
+    - name: grpc
+      port: 5002
+      targetPort: 5002
+    - name: metrics
+      port: 9091
+      targetPort: 9091
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: counter-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: counter-service
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
