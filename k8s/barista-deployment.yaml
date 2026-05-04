@@ -15,17 +15,14 @@ spec:
       containers:
         - name: barista-service
           image: go-coffeeshop-barista
-          imagePullPolicy: Never
-          command: ["sh", "-c", "sleep 3600"]
+          imagePullPolicy: IfNotPresent 
+          ports:
+            - containerPort: 80
           env:
             - name: APP_NAME
               value: "barista-service in k8s"
-            - name: IN_DOCKER
-              value: "true"
             - name: PG_URL
               value: postgres://postgres:P@ssw0rd@postgres:5432/postgres
-            - name: PG_DSN_URL
-              value: host=postgres user=postgres password=P@ssw0rd dbname=postgres sslmode=disable
             - name: RABBITMQ_URL
               value: amqp://guest:guest@rabbitmq:5672/
           resources:

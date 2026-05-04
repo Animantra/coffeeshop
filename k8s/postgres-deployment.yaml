@@ -15,15 +15,24 @@ spec:
       containers:
         - name: postgres
           image: postgres:16-alpine
-          env:
-            - name: POSTGRES_DB
-              value: postgres
-            - name: POSTGRES_USER
-              value: postgres
-            - name: POSTGRES_PASSWORD
-              value: P@ssw0rd
           ports:
             - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: coffeeshop-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: coffeeshop-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: coffeeshop-secrets
+                  key: POSTGRES_PASSWORD
           resources:
             requests:
               cpu: "100m"

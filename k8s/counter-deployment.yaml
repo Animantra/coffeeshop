@@ -24,14 +24,23 @@ spec:
               value: "counter-service in k8s"
             - name: IN_DOCKER
               value: "true"
-            - name: PG_URL
-              value: postgres://postgres:P@ssw0rd@postgres:5432/postgres
-            - name: PG_DSN_URL
-              value: host=postgres user=postgres password=P@ssw0rd dbname=postgres sslmode=disable
-            - name: RABBITMQ_URL
-              value: amqp://guest:guest@rabbitmq:5672/
             - name: PRODUCT_CLIENT_URL
-              value: product:5001
+              value: "product:5001"
+            - name: PG_URL
+              valueFrom:
+                secretKeyRef:
+                  name: coffeeshop-secrets
+                  key: PG_URL
+            - name: PG_DSN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: coffeeshop-secrets
+                  key: PG_DSN_URL
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: coffeeshop-secrets
+                  key: RABBITMQ_URL
           resources:
             requests:
               cpu: "100m"
