@@ -1,5 +1,3 @@
-//go:build migrate
-
 package app
 
 import (
@@ -28,8 +26,6 @@ func init() {
 	if !ok || len(databaseURL) == 0 {
 		glog.Fatalf("migrate: environment variable not declared: PG_URL")
 	}
-
-	databaseURL += "?sslmode=disable"
 
 	var (
 		attempts = _defaultAttempts

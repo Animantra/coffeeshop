@@ -6,16 +6,23 @@ provider "aws" {
 
 resource "aws_security_group" "coffeeshop_sg" {
   name        = "coffeeshop-sg-new"
-  description = "Allow web and monitoring traffic"
+  description = "Allow web, monitoring and kubernetes traffic"
 
   dynamic "ingress" {
-    for_each = [22, 80, 3000, 9090, 8888, 5001]
+    for_each = [22, 80, 3000, 9090, 8888, 5001, 5672, 15672, 5005, 5002, 9091, 9092]
     content {
       from_port   = ingress.value
       to_port     = ingress.value
       protocol    = "tcp"
       cidr_blocks = ["0.0.0.0/0"]
     }
+  }
+
+  ingress {
+    from_port   = 30000
+    to_port     = 32767
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
@@ -27,15 +34,16 @@ resource "aws_security_group" "coffeeshop_sg" {
 }
 
 resource "aws_instance" "app_server" {
-  ami           = var.ami_id
-  instance_type = var.instance_type
-  key_name      = var.key_name
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  key_name               = var.key_name
   vpc_security_group_ids = [aws_security_group.coffeeshop_sg.id]
 
   root_block_device {
     volume_size = 20  
     volume_type = "gp3" 
   }
+  
   user_data = file("${path.module}/scripts/script.sh")
 
   tags = {

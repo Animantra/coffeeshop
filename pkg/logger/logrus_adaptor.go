@@ -1,10 +1,7 @@
 package logger
 
-// refs:
-// https://josephwoodward.co.uk/2022/11/slog-structured-logging-proposal
-// https://thedevelopercafe.com/articles/logging-in-go-with-slog-a7bb489755c2
-
 import (
+	"context"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -27,7 +24,7 @@ func ConvertLogLevel(level string) logrus.Level {
 	switch strings.ToLower(level) {
 	case "error":
 		l = logrus.ErrorLevel
-	case "warm":
+	case "warm", "warn": // добавил warn на случай опечатки в конфиге
 		l = logrus.WarnLevel
 	case "info":
 		l = logrus.InfoLevel
@@ -40,12 +37,12 @@ func ConvertLogLevel(level string) logrus.Level {
 	return l
 }
 
-func (h *LogrusHandler) Enabled(_ slog.Level) bool {
-	// support all logging levels
+func (h *LogrusHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	// Поддерживаем все уровни логирования
 	return true
 }
 
-func (h *LogrusHandler) Handle(rec slog.Record) error {
+func (h *LogrusHandler) Handle(ctx context.Context, rec slog.Record) error {
 	fields := make(map[string]interface{}, rec.NumAttrs())
 
 	rec.Attrs(func(a slog.Attr) {
@@ -55,13 +52,13 @@ func (h *LogrusHandler) Handle(rec slog.Record) error {
 	entry := h.logger.WithFields(fields)
 
 	switch rec.Level {
-	case slog.DebugLevel:
+	case slog.LevelDebug:
 		entry.Debug(rec.Message)
-	case slog.InfoLevel.Level():
+	case slog.LevelInfo:
 		entry.Info(rec.Message)
-	case slog.WarnLevel:
+	case slog.LevelWarn:
 		entry.Warn(rec.Message)
-	case slog.ErrorLevel:
+	case slog.LevelError:
 		entry.Error(rec.Message)
 	}
 
@@ -69,11 +66,11 @@ func (h *LogrusHandler) Handle(rec slog.Record) error {
 }
 
 func (h *LogrusHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	// not implemented for brevity
+	// Возвращаем h для соответствия интерфейсу
 	return h
 }
 
 func (h *LogrusHandler) WithGroup(name string) slog.Handler {
-	// not implemented for brevity
+	// Возвращаем h для соответствия интерфейсу
 	return h
 }

@@ -29,18 +29,15 @@ var (
 
 func init() {
 	databaseURL, ok := os.LookupEnv("PG_URL")
-	if !ok || len(databaseURL) == 0 {
-		glog.Fatalf("migrate: environment variable not declared: PG_URL")
-	}
+    if !ok || len(databaseURL) == 0 {
+        glog.Fatalf("migrate: environment variable not declared: PG_URL")
+    }
 
-	databaseURL += "?sslmode=disable"
-
-	var (
-		attempts = _defaultAttempts
-		err      error
-		m        *migrate.Migrate
-	)
-
+    var (
+        attempts = _defaultAttempts
+        err      error
+        m        *migrate.Migrate
+    )
 	for attempts > 0 {
 		inDocker, ok := os.LookupEnv("IN_DOCKER")
 		if !ok || len(inDocker) == 0 {

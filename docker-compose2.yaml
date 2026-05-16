@@ -1,0 +1,202 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"] 
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    ports:
+      - "5432:5432"
+    networks:
+      - coffeeshop-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  rabbitmq:
+    image: rabbitmq:3.11-management-alpine
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - coffeeshop-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - prometheus_data:/prometheus 
+    configs:
+      - source: prom_config
+        target: /etc/prometheus/prometheus.yml
+      - source: alert_rules
+        target: /etc/prometheus/alert-rules.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - coffeeshop-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  grafana:
+    image: grafana/grafana:latest
+    env_file:
+      - .env
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - coffeeshop-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  counter:
+    image: go-coffeeshop-counter:latest
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9091/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    ports:
+      - "5002:5002"
+      - "9091:9091"
+    networks:
+      - coffeeshop-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  barista:
+    image: go-coffeeshop-barista:latest
+    env_file:
+      - .env
+    networks:
+      - coffeeshop-network
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9092/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  auth:
+    image: go-coffeeshop-auth:latest
+    env_file:
+      - .env
+    ports:
+      - "5005:5005"
+    networks:
+      - coffeeshop-network
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+
+  proxy:
+    image: go-coffeeshop-proxy:latest
+    env_file:
+      - .env
+    ports:
+      - "5001:5000"
+    networks:
+      - coffeeshop-network
+    deploy:
+      mode: replicated
+      replicas: 2
+      restart_policy:
+        condition: any
+
+  web:
+    image: go-coffeeshop-web:latest
+    env_file:
+      - .env
+    ports:
+      - "8888:8888"
+    networks:
+      - coffeeshop-network
+    deploy:
+      mode: replicated
+      replicas: 2
+      restart_policy:
+        condition: any
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    user: root
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    networks:
+      - coffeeshop-network
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    configs:
+      - source: nginx_config
+        target: /etc/nginx/nginx.conf
+    networks:
+      - coffeeshop-network
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: any
+
+configs:
+  prom_config:
+    file: ./monitoring/prometheus.yml
+  alert_rules:
+    file: ./monitoring/alert-rules.yml
+  nginx_config:
+    file: ./nginx/nginx.conf
+
+networks:
+  coffeeshop-network:
+    driver: overlay
+    attachable: true
+
+volumes:
+  grafana_data:
+  prometheus_data:

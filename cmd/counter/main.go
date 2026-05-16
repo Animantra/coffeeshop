@@ -27,13 +27,14 @@ import (
 )
 
 func main() {
-	// set GOMAXPROCS
+	// Сеттим GOMAXPROCS для корректной работы в контейнерах
 	_, err := maxprocs.Set()
 	if err != nil {
 		slog.Error("failed set max procs", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	cfg, err := config.NewConfig()
 	if err != nil {
@@ -42,49 +43,44 @@ func main() {
 
 	slog.Info("⚡ init app", "name", cfg.Name, "version", cfg.Version)
 
-	// set up logrus
+	// Настройка logrus
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	logrus.SetOutput(os.Stdout)
 	logrus.SetLevel(logger.ConvertLogLevel(cfg.Log.Level))
 
-	// integrate Logrus with the slog logger
+	// Интеграция Logrus с slog
 	slog.New(logger.NewLogrusHandler(logrus.StandardLogger()))
 
 	server := grpc.NewServer()
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		if err := http.ListenAndServe(":9091", nil); err != nil {
-			slog.Error("metrics server failed", err)
-		}
-	}()
 
+	// Асинхронный перехват отмены контекста для мягкой остановки gRPC
 	go func() {
-		defer server.GracefulStop()
 		<-ctx.Done()
+		slog.Info("🔄 Shutting down gRPC server gracefully...")
+		server.GracefulStop()
 	}()
 
 	cleanup := prepareApp(ctx, cancel, cfg, server)
 
-	// gRPC Server.
+	// Настройка сетевого лисенера для gRPC
 	address := fmt.Sprintf("%s:%d", cfg.HTTP.Host, cfg.HTTP.Port)
 	network := "tcp"
 
 	l, err := net.Listen(network, address)
 	if err != nil {
 		slog.Error("failed to listen to address", err, "network", network, "address", address)
-		cancel()
-		<-ctx.Done()
+		return
 	}
 
 	slog.Info("🌏 start server...", "address", address)
 
 	defer func() {
-		if err1 := l.Close(); err != nil {
-			slog.Error("failed to close", err1, "network", network, "address", address)
-			<-ctx.Done()
+		if err1 := l.Close(); err1 != nil {
+			slog.Error("failed to close listener", err1, "network", network, "address", address)
 		}
 	}()
 
+	// Сервер метрик и хелсчеков
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -96,24 +92,29 @@ func main() {
 		}
 	}()
 
-	err = server.Serve(l)
-	if err != nil {
-		slog.Error("failed start gRPC server", err, "network", network, "address", address)
-		cancel()
-		<-ctx.Done()
-	}
+	// Запускаем gRPC-сервер в горутине, чтобы он не блокировал main
+	go func() {
+		if err := server.Serve(l); err != nil && err != grpc.ErrServerStopped {
+			slog.Error("failed start gRPC server", err, "network", network, "address", address)
+			cancel()
+		}
+	}()
 
+	// Канал для системных сигналов (Ctrl+C, SIGTERM от Kubernetes)
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
+	// Точка блокировки: ждем либо сигнал от ОС, либо критическую отмену контекста
 	select {
 	case v := <-quit:
-		cleanup()
-		slog.Info("signal.Notify", v)
-	case done := <-ctx.Done():
-		cleanup()
-		slog.Info("ctx.Done", "app done", done)
+		slog.Info("🔴 Signal received, exiting...", "signal", v)
+	case <-ctx.Done():
+		slog.Info("⚠️ Context canceled, app is stopping...")
 	}
+
+	// Финальная очистка ресурсов (закрытие коннектов к БД и брокеру)
+	cleanup()
+	slog.Info("👋 Counter-service successfully stopped")
 }
 
 func prepareApp(ctx context.Context, cancel context.CancelFunc, cfg *config.Config, server *grpc.Server) func() {
@@ -121,7 +122,7 @@ func prepareApp(ctx context.Context, cancel context.CancelFunc, cfg *config.Conf
 	if err != nil {
 		slog.Error("failed init app", err)
 		cancel()
-		<-ctx.Done()
+		return func() {}
 	}
 
 	a.BaristaOrderPub.Configure(
@@ -143,12 +144,12 @@ func prepareApp(ctx context.Context, cancel context.CancelFunc, cfg *config.Conf
 		pkgConsumer.ConsumerTag("counter-order-consumer"),
 	)
 
+	// Безопасный запуск консьюмера без дедлока главного потока
 	go func() {
 		err1 := a.Consumer.StartConsumer(a.Worker)
 		if err1 != nil {
 			slog.Error("failed to start Consumer", err1)
 			cancel()
-			<-ctx.Done()
 		}
 	}()
 
