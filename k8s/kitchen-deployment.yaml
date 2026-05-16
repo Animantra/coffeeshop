@@ -49,13 +49,12 @@ kind: Service
 metadata:
   name: kitchen-service
 spec:
-  type: NodePort       
+  type: ClusterIP       
   selector:
     app: kitchen-service
   ports:
     - port: 80
-      targetPort: 80    
-      nodePort: 30080
+      targetPort: 80
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

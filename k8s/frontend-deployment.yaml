@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-service
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-frontend
+  template:
+    metadata:
+      labels:
+        app: web-frontend
+    spec:
+      containers:
+      - name: web-frontend
+        image: go-coffeeshop-web:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        env:
+        - name: WEB_PORT
+          value: "8080"
+        - name: APP_NAME
+          value: "web-frontend in k8s"
+        # Если твоему фронтенду нужен адрес кассы или авторизации, 
+        # K8s позволяет обращаться к ним просто по имени сервиса:
+        - name: COUNTER_API_URL
+          value: "http://counter-service:5002" 
+        - name: AUTH_API_URL
+          value: "http://auth-service:5005"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: web-frontend
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+    nodePort: 30080 
