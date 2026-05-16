@@ -24,12 +24,8 @@ spec:
           value: "8080"
         - name: APP_NAME
           value: "web-frontend in k8s"
-        # Если твоему фронтенду нужен адрес кассы или авторизации, 
-        # K8s позволяет обращаться к ним просто по имени сервиса:
-        - name: COUNTER_API_URL
-          value: "http://counter-service:5002" 
-        - name: AUTH_API_URL
-          value: "http://auth-service:5005"
+        - name: reverseProxyURL
+          value: "http://proxy-service:80" 
         resources:
           requests:
             cpu: "100m"
