@@ -26,10 +26,13 @@ spec:
           value: "web-frontend in k8s"
         - name: reverseProxyURL
           value: "http://proxy-service:80" 
+<<<<<<< HEAD
         - name: REVERSE_PROXY_URL
           value: "http://proxy-service:80"
         - name: REVERSEPROXYURL
           value: "http://proxy-service:80"
+=======
+>>>>>>> f77f3aa41c578d8701c7924b048fe19a047d38fe
         resources:
           requests:
             cpu: "100m"
