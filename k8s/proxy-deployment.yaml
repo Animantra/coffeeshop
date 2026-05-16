@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy-service
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxy-service
+  template:
+    metadata:
+      labels:
+        app: proxy-service
+    spec:
+      containers:
+      - name: proxy-service
+        image: go-coffeeshop-proxy:latest  # Тот самый образ из списка
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80                # Прокси обычно слушает 80 порт
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "150m"
+            memory: "128Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxy-service                      # Вот это имя теперь на 100% валидно для фронтенда!
+  namespace: default
+spec:
+  type: ClusterIP                          # Ему не нужен NodePort, фронт сам до него достучится
+  selector:
+    app: proxy-service
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
